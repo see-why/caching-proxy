@@ -23,7 +23,7 @@ module CachingProxy
 
       body = response.body
       headers = {}
-      resposne.each_header { |k, v| headers[k] = v }
+      response.each_header { |k, v| headers[k] = v }
 
       @cache.set(key, { status: response.code.to_i, headers: headers, body: body })
 

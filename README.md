@@ -14,7 +14,7 @@ A lightweight HTTP caching proxy server built in Ruby that sits between clients 
 
 ### Prerequisites
 
-- Ruby 2.7 or higher
+- Ruby 3.0 or higher
 - Bundler
 
 ### Setup

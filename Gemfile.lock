@@ -2,7 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     dotenv (3.1.8)
-    rack (3.1.16)
+    rack (2.2.17)
     webrick (1.9.1)
 
 PLATFORMS
@@ -11,7 +11,7 @@ PLATFORMS
 
 DEPENDENCIES
   dotenv
-  rack
+  rack (~> 2.2)
   webrick
 
 BUNDLED WITH

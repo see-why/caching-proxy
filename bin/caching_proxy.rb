@@ -8,7 +8,7 @@ require 'caching_proxy/server'
 require 'caching_proxy/cache'
 
 options = CachingProxy::Cli.parse_args
-cache = CatchingPorxy::Cache.new
+cache = CatchingProxy::Cache.new
 
 if options[:clear_cache]
   cache.clear

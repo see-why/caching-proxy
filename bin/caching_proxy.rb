@@ -8,7 +8,7 @@ require 'caching_proxy/server'
 require 'caching_proxy/cache'
 
 options = CachingProxy::Cli.parse_args
-cache = CatchingProxy::Cache.new
+cache = CachingProxy::Cache.new
 
 if options[:clear_cache]
   cache.clear
@@ -18,7 +18,7 @@ end
 
 if options[:port] && options[:origin]
   begin
-    app = CachiongProxy::Server.new(options[:origin], cache)
+    app = CachingProxy::Server.new(options[:origin], cache)
     Rack::Handler::WEBrick.run app, Port: options[:port]
   rescue => e
     puts "Cached server error: #{e}"

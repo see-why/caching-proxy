@@ -3,6 +3,7 @@
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 require 'rack'
+require 'rack/handler/webrick'
 require 'caching_proxy/cli'
 require 'caching_proxy/server'
 require 'caching_proxy/cache'
@@ -21,7 +22,7 @@ if options[:port] && options[:origin]
     app = CachingProxy::Server.new(options[:origin], cache)
     Rack::Handler::WEBrick.run app, Port: options[:port]
   rescue => e
-    puts "Cached server error: #{e}"
+    puts "Caching server error: #{e}"
   end
 else
   puts "Missing --port or --origin"

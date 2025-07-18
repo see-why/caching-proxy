@@ -10,7 +10,7 @@ module CachingProxy
       @cache = cache
     end
 
-    def call
+    def call(env)
       key = @origin
 
       if @cache.key? key

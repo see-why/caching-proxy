@@ -21,8 +21,8 @@ module CachingProxy
 
       key = @origin
 
-      if @cache.store.key? key
-        cached = @cache[key]
+      if @cache.key? key
+        cached = @cache.get(key)
         return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
       end
 

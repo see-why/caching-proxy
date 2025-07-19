@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module CachingProxy
+  attr_reader :store
   class Cache
     def initialize
       @store = {}

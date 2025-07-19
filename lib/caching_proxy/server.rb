@@ -26,7 +26,7 @@ module CachingProxy
         return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
       end
 
-      uri = URI.new(@origin)
+      uri = URI.parse(@origin)
       response = Net::HTTP.get_response(uri)
 
       body = response.body

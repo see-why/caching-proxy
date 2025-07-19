@@ -11,9 +11,17 @@ module CachingProxy
     end
 
     def call(env)
+      request_method = env['REQUEST_METHOD']
+      path_info = env['PATH_INFO']
+      query_string = env['QUERY_STRING']
+
+      puts "request_method: #{request_method}"
+      puts "path_info: #{path_info}"
+      puts "query_string: #{query_string}"
+
       key = @origin
 
-      if @cache.key? key
+      if @cache.store.key? key
         cached = @cache[key]
         return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
       end

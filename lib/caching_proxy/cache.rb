@@ -15,7 +15,7 @@ module CachingProxy
     end
 
     def set(key, value)
-      @store[key] = response
+      @store[key] = value
     end
 
     def clear

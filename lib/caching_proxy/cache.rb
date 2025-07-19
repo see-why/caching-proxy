@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
 module CachingProxy
-  attr_reader :store
   class Cache
     def initialize
       @store = {}
+    end
+
+    def key?(key)
+      @store.key? key
     end
 
     def get(key)

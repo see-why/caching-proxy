@@ -19,21 +19,21 @@ module CachingProxy
       puts "path_info: #{path_info}"
       puts "query_string: #{query_string}"
 
-      key = @origin
+      url = "#{@origin}#{path_info}"
 
-      if @cache.key? key
-        cached = @cache.get(key)
+      if @cache.key? url
+        cached = @cache.get(url)
         return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
       end
 
-      uri = URI.parse(@origin)
+      uri = URI.parse(url)
       response = Net::HTTP.get_response(uri)
 
       body = response.body
       headers = {}
       response.each_header { |k, v| headers[k] = v }
 
-      @cache.set(key, { status: response.code.to_i, headers: headers, body: body })
+      @cache.set(url, { status: response.code.to_i, headers: headers, body: body })
 
       [response.code.to_i, headers.merge('X-Cache' => 'MISS'), [body]]
     end

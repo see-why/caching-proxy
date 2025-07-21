@@ -12,12 +12,10 @@ module CachingProxy
 
     def call(env)
       request_method = env['REQUEST_METHOD']
+      return [405, {}, ['Method Not Allowed']] unless request_method == 'GET'
+
       path_info = env['PATH_INFO']
       query_string = env['QUERY_STRING']
-
-      puts "request_method: #{request_method}"
-      puts "path_info: #{path_info}"
-      puts "query_string: #{query_string}"
 
       url = "#{@origin}#{path_info}"
       url += "?#{query_string}" unless query_string.nil? || query_string.empty?

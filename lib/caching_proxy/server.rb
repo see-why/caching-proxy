@@ -31,7 +31,7 @@ module CachingProxy
 
       body = response.body
       headers = {}
-      response.each_header { |k, v| headers[k] = v }
+      response.each_header { |k, v| headers[k] = v if k.to_s.downcase != 'transfer-encoding' }
 
       @cache.set(url, { status: response.code.to_i, headers: headers, body: body })
 

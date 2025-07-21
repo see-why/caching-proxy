@@ -20,6 +20,7 @@ module CachingProxy
       puts "query_string: #{query_string}"
 
       url = "#{@origin}#{path_info}"
+      url += "?#{query_string}" unless query_string.nil? || query_string.empty?
 
       if @cache.key? url
         cached = @cache.get(url)

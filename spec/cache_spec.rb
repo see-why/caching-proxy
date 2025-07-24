@@ -13,4 +13,6 @@ RSpec.describe 'Cache' do
 
     expect(subject.get(url)).to eq(response)
   end
+
+  it ''
 end

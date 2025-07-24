@@ -8,11 +8,17 @@ RSpec.describe 'Cache' do
   let(:url) { 'url@get.com' }
   let(:response) { { status: 200, data: :success } }
 
-  it 'sets a value with a key' do
+  before do
     subject.set(url, response)
+  end
 
+  it 'sets a value with a key' do
     expect(subject.get(url)).to eq(response)
   end
 
-  it ''
+  it 'clears its store' do
+    subject.clear
+
+    expect(subject.get(url)).to be_nil
+  end
 end

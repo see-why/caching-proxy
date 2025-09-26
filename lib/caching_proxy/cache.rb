@@ -14,7 +14,7 @@ module CachingProxy
       entry = @store[key]
       return false unless entry
 
-      entry && !expired?(entry)
+      !expired?(entry)
     end
 
     def get(key)

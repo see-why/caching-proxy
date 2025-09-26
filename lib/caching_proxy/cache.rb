@@ -42,7 +42,9 @@ module CachingProxy
     private
 
     def expired?(entry)
-      Time.now > entry[:expires_at]
+      expires_at = entry[:expires_at]
+      return true if expires_at.nil?
+      Time.now > expires_at
     end
   end
 end

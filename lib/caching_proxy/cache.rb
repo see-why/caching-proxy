@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-
 module CachingProxy
   class Cache
     DEFAULT_TTL = 300 # seconds

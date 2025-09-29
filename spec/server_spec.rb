@@ -42,7 +42,6 @@ RSpec.describe CachingProxy::Server do
     stub_response = build_stub_response(cache_control: 'max-age=2')
     allow_any_instance_of(Net::HTTP).to receive(:request).and_return(stub_response)
     expect(cache).to receive(:set) do |key, value, ttl|
-      puts "DEBUG: cache.set called with ttl=#{ttl.inspect}"
       expect(ttl).to eq(2)
     end
     server.call(rack_env)
@@ -53,7 +52,7 @@ RSpec.describe CachingProxy::Server do
     allow_any_instance_of(Net::HTTP).to receive(:request).and_return(stub_response)
     expect(cache).not_to receive(:set)
     status, headers, body = server.call(rack_env)
-    puts "DEBUG: X-Cache header value: #{headers['X-Cache']}"
+
     expect(headers['X-Cache']).to eq('BYPASS')
     expect(status).to eq(200)
     expect(body).to eq(['body'])
@@ -63,7 +62,6 @@ RSpec.describe CachingProxy::Server do
     stub_response = build_stub_response # no cache-control header
     allow_any_instance_of(Net::HTTP).to receive(:request).and_return(stub_response)
     expect(cache).to receive(:set) do |key, value, ttl|
-      puts "DEBUG: cache.set called with ttl=#{ttl.inspect}"
       expect([nil, 1]).to include(ttl)
     end
     server.call(rack_env)

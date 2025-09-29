@@ -25,10 +25,8 @@ module CachingProxy
       cache_control_directives = cached ? parse_cache_control(cached[:headers]) : []
 
       # If cached and not marked no-cache, serve from cache
-      unless cache_control_directives.include?('no-cache')
-        if cached
-          return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
-        end
+      if cached && !cache_control_directives.include?('no-cache')
+        return [cached[:status], cached[:headers].merge('X-Cache' => 'HIT'), [cached[:body]]]
       end
 
       # If cached and marked no-cache, revalidate with origin
@@ -71,6 +69,7 @@ module CachingProxy
 
     def parse_cache_control(headers)
       cc = headers['cache-control'] || headers['Cache-Control']
+      return [] if cc.nil? || cc.to_s.strip.empty?
       cc.to_s.downcase.split(',').map(&:strip)
     end
 

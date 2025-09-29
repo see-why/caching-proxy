@@ -49,16 +49,21 @@ module CachingProxy
         return [cached[:status], cached[:headers].merge('X-Cache' => 'REVALIDATED'), [cached[:body]]]
       end
 
-      # If no-store, do not cache at all
+      # If no-store, do not cache at all (early return)
       if directives.include?('no-store')
         return [response.code.to_i, headers.merge('X-Cache' => 'NO-STORE'), [body]]
       end
 
-      # Store in cache (even if no-cache, but always revalidate before serving)
+      # If no-cache, do not cache, but set header to BYPASS
+      if directives.include?('no-cache')
+        return [response.code.to_i, headers.merge('X-Cache' => 'BYPASS'), [body]]
+      end
+
+      # Store in cache (normal case)
       @cache.set(url, { status: response.code.to_i, headers: headers, body: body }, ttl)
 
-      # If no-cache, mark as BYPASS, else MISS
-      x_cache = directives.include?('no-cache') ? 'BYPASS' : 'MISS'
+      # If max-age, set MISS, else default
+      x_cache = 'MISS'
       [response.code.to_i, headers.merge('X-Cache' => x_cache), [body]]
     end
 
@@ -66,7 +71,9 @@ module CachingProxy
 
     def parse_cache_control(headers)
       cc = headers['cache-control'] || headers['Cache-Control']
-      cc.to_s.downcase.split(',').map(&:strip)
+      directives = cc.to_s.downcase.split(',').map(&:strip)
+      puts "DEBUG: cache-control header: #{cc.inspect}, directives: #{directives.inspect}"
+      directives
     end
 
     def extract_ttl(directives)
@@ -89,6 +96,7 @@ module CachingProxy
     def extract_headers(response)
       headers = {}
       response.each_header { |k, v| headers[k] = v if k.to_s.downcase != 'transfer-encoding' }
+      puts "DEBUG: extracted headers: #{headers.inspect}"
       headers
     end
   end

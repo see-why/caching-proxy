@@ -32,9 +32,27 @@ module CachingProxy
       headers = {}
       response.each_header { |k, v| headers[k] = v if k.to_s.downcase != 'transfer-encoding' }
 
-      @cache.set(url, { status: response.code.to_i, headers: headers, body: body })
+      # Handle Cache-Control headers
+      cache_control = headers['cache-control'] || headers['Cache-Control']
+      cacheable = true
+      ttl = nil
+      if cache_control
+        directives = cache_control.downcase.split(',').map(&:strip)
+        if directives.include?('no-cache') || directives.include?('must-revalidate')
+          cacheable = false
+        end
+        max_age = directives.find { |d| d.start_with?('max-age=') }
+        if max_age
+          ttl_val = max_age.split('=', 2)[1]
+          ttl = ttl_val.to_i if ttl_val =~ /^\d+$/
+        end
+      end
 
-      [response.code.to_i, headers.merge('X-Cache' => 'MISS'), [body]]
+      if cacheable
+        @cache.set(url, { status: response.code.to_i, headers: headers, body: body }, ttl)
+      end
+
+      [response.code.to_i, headers.merge('X-Cache' => cacheable ? 'MISS' : 'BYPASS'), [body]]
     end
   end
 end

@@ -57,6 +57,11 @@ module CachingProxy
         return [cached[:status], cached[:headers].merge('X-Cache' => 'REVALIDATED'), [cached[:body]]]
       end
 
+      # If no-store, do not cache at all
+      if directives.include?('no-store')
+        return [response.code.to_i, headers.merge('X-Cache' => 'NO-STORE'), [body]]
+      end
+
       # Store in cache (even if no-cache, but always revalidate before serving)
       @cache.set(url, { status: response.code.to_i, headers: headers, body: body }, ttl)
 

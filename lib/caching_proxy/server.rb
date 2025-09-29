@@ -71,9 +71,7 @@ module CachingProxy
 
     def parse_cache_control(headers)
       cc = headers['cache-control'] || headers['Cache-Control']
-      directives = cc.to_s.downcase.split(',').map(&:strip)
-      puts "DEBUG: cache-control header: #{cc.inspect}, directives: #{directives.inspect}"
-      directives
+      cc.to_s.downcase.split(',').map(&:strip)
     end
 
     def extract_ttl(directives)
@@ -96,7 +94,6 @@ module CachingProxy
     def extract_headers(response)
       headers = {}
       response.each_header { |k, v| headers[k] = v if k.to_s.downcase != 'transfer-encoding' }
-      puts "DEBUG: extracted headers: #{headers.inspect}"
       headers
     end
   end

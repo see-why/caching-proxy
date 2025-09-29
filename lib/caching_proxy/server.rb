@@ -3,7 +3,6 @@
 require 'net/http'
 require 'uri'
 
-
 module CachingProxy
   class Server
     def initialize(origin, cache)

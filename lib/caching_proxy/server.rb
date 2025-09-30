@@ -76,7 +76,7 @@ module CachingProxy
       request_method = env['REQUEST_METHOD']
       path_info = env['PATH_INFO']
       query_string = env['QUERY_STRING']
-      
+
       case path_info
       when '/__cache__/stats'
         return handle_cache_stats(request_method)
@@ -93,7 +93,7 @@ module CachingProxy
 
     def handle_cache_stats(method)
       return [405, {}, ['Method Not Allowed']] unless method == 'GET'
-      
+
       stats = @cache.stats
       response_body = JSON.generate(stats)
       [200, {'Content-Type' => 'application/json'}, [response_body]]
@@ -101,7 +101,7 @@ module CachingProxy
 
     def handle_cache_keys(method)
       return [405, {}, ['Method Not Allowed']] unless method == 'GET'
-      
+
       keys = @cache.keys
       response_body = JSON.generate({ keys: keys, count: keys.size })
       [200, {'Content-Type' => 'application/json'}, [response_body]]
@@ -109,7 +109,7 @@ module CachingProxy
 
     def handle_cache_clear(method)
       return [405, {}, ['Method Not Allowed']] unless method == 'POST'
-      
+
       @cache.clear
       response_body = JSON.generate({ message: 'Cache cleared successfully' })
       [200, {'Content-Type' => 'application/json'}, [response_body]]
@@ -117,16 +117,16 @@ module CachingProxy
 
     def handle_cache_invalidate(method, query_string)
       return [405, {}, ['Method Not Allowed']] unless method == 'POST'
-      
+
       params = parse_query_string(query_string)
-      
+
       if params['key']
         result = @cache.invalidate(params['key'])
         message = result ? 'Key invalidated successfully' : 'Key not found'
         response_body = JSON.generate({ message: message, key: params['key'] })
       elsif params['pattern']
         deleted_keys = @cache.invalidate_pattern(params['pattern'])
-        response_body = JSON.generate({ 
+        response_body = JSON.generate({
           message: "#{deleted_keys.size} keys invalidated",
           pattern: params['pattern'],
           deleted_keys: deleted_keys
@@ -134,13 +134,13 @@ module CachingProxy
       else
         return [400, {}, ['Missing key or pattern parameter']]
       end
-      
+
       [200, {'Content-Type' => 'application/json'}, [response_body]]
     end
 
     def parse_query_string(query_string)
       return {} if query_string.nil? || query_string.empty?
-      
+
       params = {}
       query_string.split('&').each do |pair|
         key, value = pair.split('=', 2)

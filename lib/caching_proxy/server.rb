@@ -2,6 +2,7 @@
 
 require 'net/http'
 require 'uri'
+require 'json'
 
 module CachingProxy
   class Server
@@ -12,10 +13,15 @@ module CachingProxy
 
     def call(env)
       request_method = env['REQUEST_METHOD']
-      return [405, {}, ['Method Not Allowed']] unless request_method == 'GET'
-
       path_info = env['PATH_INFO']
       query_string = env['QUERY_STRING']
+
+      # Handle admin endpoints
+      if path_info.start_with?('/__cache__')
+        return handle_admin_request(env)
+      end
+
+      return [405, {}, ['Method Not Allowed']] unless request_method == 'GET'
 
       url = "#{@origin}#{path_info}"
       url += "?#{query_string}" unless query_string.nil? || query_string.empty?
@@ -65,6 +71,83 @@ module CachingProxy
     end
 
     private
+
+    def handle_admin_request(env)
+      request_method = env['REQUEST_METHOD']
+      path_info = env['PATH_INFO']
+      query_string = env['QUERY_STRING']
+      
+      case path_info
+      when '/__cache__/stats'
+        return handle_cache_stats(request_method)
+      when '/__cache__/keys'
+        return handle_cache_keys(request_method)
+      when '/__cache__/clear'
+        return handle_cache_clear(request_method)
+      when '/__cache__/invalidate'
+        return handle_cache_invalidate(request_method, query_string)
+      else
+        return [404, {}, ['Admin endpoint not found']]
+      end
+    end
+
+    def handle_cache_stats(method)
+      return [405, {}, ['Method Not Allowed']] unless method == 'GET'
+      
+      stats = @cache.stats
+      response_body = JSON.generate(stats)
+      [200, {'Content-Type' => 'application/json'}, [response_body]]
+    end
+
+    def handle_cache_keys(method)
+      return [405, {}, ['Method Not Allowed']] unless method == 'GET'
+      
+      keys = @cache.keys
+      response_body = JSON.generate({ keys: keys, count: keys.size })
+      [200, {'Content-Type' => 'application/json'}, [response_body]]
+    end
+
+    def handle_cache_clear(method)
+      return [405, {}, ['Method Not Allowed']] unless method == 'POST'
+      
+      @cache.clear
+      response_body = JSON.generate({ message: 'Cache cleared successfully' })
+      [200, {'Content-Type' => 'application/json'}, [response_body]]
+    end
+
+    def handle_cache_invalidate(method, query_string)
+      return [405, {}, ['Method Not Allowed']] unless method == 'POST'
+      
+      params = parse_query_string(query_string)
+      
+      if params['key']
+        result = @cache.invalidate(params['key'])
+        message = result ? 'Key invalidated successfully' : 'Key not found'
+        response_body = JSON.generate({ message: message, key: params['key'] })
+      elsif params['pattern']
+        deleted_keys = @cache.invalidate_pattern(params['pattern'])
+        response_body = JSON.generate({ 
+          message: "#{deleted_keys.size} keys invalidated",
+          pattern: params['pattern'],
+          deleted_keys: deleted_keys
+        })
+      else
+        return [400, {}, ['Missing key or pattern parameter']]
+      end
+      
+      [200, {'Content-Type' => 'application/json'}, [response_body]]
+    end
+
+    def parse_query_string(query_string)
+      return {} if query_string.nil? || query_string.empty?
+      
+      params = {}
+      query_string.split('&').each do |pair|
+        key, value = pair.split('=', 2)
+        params[URI.decode_www_form_component(key)] = URI.decode_www_form_component(value || '')
+      end
+      params
+    end
 
     def parse_cache_control(headers)
       cc = headers['cache-control'] || headers['Cache-Control']

@@ -177,6 +177,7 @@ Osita Cyril Iyadi
 - Built with Ruby's Rack framework
 - Uses WEBrick for HTTP server functionality
 - Inspired by modern caching proxy solutions
+- [Project URL](https://roadmap.sh/projects/caching-server)
 
 ---
 

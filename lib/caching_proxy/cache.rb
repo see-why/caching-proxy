@@ -35,6 +35,34 @@ module CachingProxy
       @store.delete(key)
     end
 
+    def invalidate_pattern(pattern)
+      regex = pattern_to_regex(pattern)
+      deleted_keys = []
+      @store.keys.each do |key|
+        if regex.match?(key)
+          @store.delete(key)
+          deleted_keys << key
+        end
+      end
+      deleted_keys
+    end
+
+    def keys
+      @store.keys.select { |key| key?(key) }
+    end
+
+    def size
+      @store.size
+    end
+
+    def stats
+      {
+        total_keys: @store.size,
+        active_keys: keys.size,
+        expired_keys: @store.size - keys.size
+      }
+    end
+
     def clear
       @store.clear
     end
@@ -45,6 +73,15 @@ module CachingProxy
       expires_at = entry[:expires_at]
       return true if expires_at.nil?
       Time.now > expires_at
+    end
+
+    def pattern_to_regex(pattern)
+      # Convert shell-style wildcards to regex
+      # * matches any characters
+      # ? matches single character
+      escaped = Regexp.escape(pattern)
+      regex_pattern = escaped.gsub('\*', '.*').gsub('\?', '.')
+      Regexp.new("^#{regex_pattern}$")
     end
   end
 end

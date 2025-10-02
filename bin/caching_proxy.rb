@@ -17,6 +17,39 @@ if options[:clear_cache]
   exit
 end
 
+if options[:invalidate_key]
+  result = cache.invalidate(options[:invalidate_key])
+  if result
+    puts "Key '#{options[:invalidate_key]}' invalidated"
+  else
+    puts "Key '#{options[:invalidate_key]}' not found"
+  end
+  exit
+end
+
+if options[:invalidate_pattern]
+  deleted_keys = cache.invalidate_pattern(options[:invalidate_pattern])
+  puts "#{deleted_keys.size} keys invalidated matching pattern '#{options[:invalidate_pattern]}'"
+  deleted_keys.each { |key| puts "  - #{key}" }
+  exit
+end
+
+if options[:cache_stats]
+  stats = cache.stats
+  puts "Cache Statistics:"
+  puts "  Total keys: #{stats[:total_keys]}"
+  puts "  Active keys: #{stats[:active_keys]}"
+  puts "  Expired keys: #{stats[:expired_keys]}"
+  exit
+end
+
+if options[:cache_keys]
+  keys = cache.keys
+  puts "Cache Keys (#{keys.size}):"
+  keys.each { |key| puts "  - #{key}" }
+  exit
+end
+
 if options[:port] && options[:origin]
   begin
     app = CachingProxy::Server.new(options[:origin], cache)

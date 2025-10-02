@@ -44,10 +44,16 @@ ruby bin/caching_proxy.rb --port 3000 --origin http://example.com
 
 ### Command Line Options
 
-- `--port, -p`: Port to run the proxy server on (default: 3000)
-- `--origin, -o`: Origin server URL to proxy requests to
-- `--cache-dir`: Directory to store cached responses (default: ./cache)
-- `--help, -h`: Show help message
+**Server Options:**
+- `--port PORT`: Port to run the proxy server on
+- `--origin URL`: Origin server URL to proxy requests to
+
+**Cache Management Options:**
+- `--clear-cache`: Clear all cached entries
+- `--invalidate-key KEY`: Invalidate a specific cache key
+- `--invalidate-pattern PATTERN`: Invalidate keys matching pattern (supports * and ?)
+- `--cache-stats`: Show cache statistics
+- `--cache-keys`: List all cache keys
 
 ### Examples
 
@@ -71,6 +77,58 @@ curl -i http://localhost:3000/posts/1
 
 # Second request (cache hit)
 curl -i http://localhost:3000/posts/1
+```
+
+### Cache Management
+
+1. **Clear all cache**:
+```bash
+ruby bin/caching_proxy.rb --clear-cache
+```
+
+2. **Invalidate specific key**:
+```bash
+ruby bin/caching_proxy.rb --invalidate-key "https://api.example.com/posts/1"
+```
+
+3. **Invalidate keys by pattern**:
+```bash
+# Invalidate all user-related endpoints
+ruby bin/caching_proxy.rb --invalidate-pattern "*users*"
+
+# Invalidate specific post patterns
+ruby bin/caching_proxy.rb --invalidate-pattern "*/posts/?"
+```
+
+4. **View cache statistics**:
+```bash
+ruby bin/caching_proxy.rb --cache-stats
+```
+
+5. **List all cache keys**:
+```bash
+ruby bin/caching_proxy.rb --cache-keys
+```
+
+### Admin Endpoints
+
+When the proxy server is running, you can also manage the cache via HTTP endpoints:
+
+```bash
+# Get cache statistics
+curl http://localhost:3000/__cache__/stats
+
+# List all cache keys
+curl http://localhost:3000/__cache__/keys
+
+# Clear all cache
+curl -X POST http://localhost:3000/__cache__/clear
+
+# Invalidate specific key
+curl -X POST "http://localhost:3000/__cache__/invalidate?key=https://api.example.com/posts/1"
+
+# Invalidate by pattern
+curl -X POST "http://localhost:3000/__cache__/invalidate?pattern=*users*"
 ```
 
 ## How It Works

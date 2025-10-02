@@ -2,6 +2,7 @@
 
 require 'net/http'
 require 'uri'
+require 'json'
 
 module CachingProxy
   class Server

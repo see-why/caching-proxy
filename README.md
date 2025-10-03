@@ -180,6 +180,12 @@ curl -X POST "http://localhost:3000/__cache__/invalidate?pattern=*users*"
 - **Smart Invalidation**: 
   - POST to `/users` invalidates `GET:/users/*`
   - PUT/DELETE to `/users/1` invalidates `GET:/users/1` and `GET:/users/*`
+- **Flexible Resource ID Detection**: Automatically recognizes various ID formats:
+  - Numeric IDs: `/users/123`
+  - Alphanumeric with numbers: `/users/abc123`, `/users/user_123`
+  - UUIDs: `/users/123e4567-e89b-12d3-a456-426614174000`
+  - Complex patterns: `/items/2023_report_v1`, `/docs/doc-v2-final`
+  - Distinguishes IDs from collection names (won't match `/users` as an ID)
 - **TTL**: Time-based expiration (configurable, respects max-age)
 - **Headers**: Respects HTTP cache-control headers (max-age, no-cache, no-store)
 
@@ -243,6 +249,43 @@ The proxy logs important events including:
 - Request forwarding
 - Error conditions
 - Server start/stop events
+
+## Programmatic Usage
+
+You can also use the caching proxy programmatically in your Ruby applications:
+
+```ruby
+require_relative 'lib/caching_proxy/server'
+require_relative 'lib/caching_proxy/cache'
+
+# Basic usage
+cache = CachingProxy::Cache.new(300) # 5 minute TTL
+server = CachingProxy::Server.new('http://example.com', cache)
+
+# Custom resource ID pattern for specific use cases
+# Example: Only match numeric IDs
+numeric_pattern = %r{/[0-9]+/?$}
+server = CachingProxy::Server.new('http://example.com', cache, 
+                                  resource_id_pattern: numeric_pattern)
+
+# Example: Match specific ID formats (e.g., prefixed IDs)
+prefixed_pattern = %r{/(user|post|item)_[a-zA-Z0-9]+/?$}
+server = CachingProxy::Server.new('http://example.com', cache, 
+                                  resource_id_pattern: prefixed_pattern)
+
+# Start the server
+require 'rackup/handler/webrick'
+Rackup::Handler::WEBrick.run(server, Port: 8080)
+```
+
+### Custom Resource ID Patterns
+
+The default pattern recognizes most common ID formats, but you can customize it for specific needs:
+
+- **Default**: `%r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}` - Matches IDs containing numbers, underscores, or hyphens
+- **Numeric only**: `%r{/[0-9]+/?$}` - Only numeric IDs like `/users/123`
+- **UUID only**: `%r{/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/?$}` - UUID format
+- **Prefixed**: `%r{/prefix_[a-zA-Z0-9]+/?$}` - IDs with specific prefixes
 
 ## License
 

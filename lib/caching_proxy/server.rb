@@ -6,9 +6,17 @@ require 'json'
 
 module CachingProxy
   class Server
-    def initialize(origin, cache)
+    # Default pattern matches common ID formats:
+    # - UUIDs: 123e4567-e89b-12d3-a456-426614174000
+    # - Alphanumeric with numbers: abc123, user_123, item-456
+    # - Numeric: 123, 456
+    # - Must contain either a number, underscore, or hyphen to distinguish from collection names
+    DEFAULT_RESOURCE_ID_PATTERN = %r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}
+
+    def initialize(origin, cache, resource_id_pattern: DEFAULT_RESOURCE_ID_PATTERN)
       @origin = origin
       @cache = cache
+      @resource_id_pattern = resource_id_pattern
     end
 
     def call(env)
@@ -239,18 +247,18 @@ module CachingProxy
         base_url = url.gsub(/\?.*$/, '') # Remove query string
         @cache.invalidate_pattern("GET:#{base_url}*")
       when 'PUT', 'PATCH'
-        # PUT/PATCH to /users/1 should invalidate /users/1 and possibly /users
+        # PUT/PATCH to /users/abc123 should invalidate /users/abc123 and possibly /users
         @cache.invalidate_pattern("GET:#{url}")
         # Also invalidate collection if this looks like a resource update
-        if url =~ %r{/\d+/?$}
-          collection_url = url.gsub(%r{/\d+/?$}, '')
+        if url =~ @resource_id_pattern
+          collection_url = url.gsub(@resource_id_pattern, '')
           @cache.invalidate_pattern("GET:#{collection_url}*")
         end
       when 'DELETE'
-        # DELETE to /users/1 should invalidate /users/1 and /users
+        # DELETE to /users/abc123 should invalidate /users/abc123 and /users
         @cache.invalidate_pattern("GET:#{url}")
-        if url =~ %r{/\d+/?$}
-          collection_url = url.gsub(%r{/\d+/?$}, '')
+        if url =~ @resource_id_pattern
+          collection_url = url.gsub(@resource_id_pattern, '')
           @cache.invalidate_pattern("GET:#{collection_url}*")
         end
       end

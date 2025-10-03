@@ -13,6 +13,18 @@ module CachingProxy
     # - Must contain either a number, underscore, or hyphen to distinguish from collection names
     DEFAULT_RESOURCE_ID_PATTERN = %r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}
 
+    # Hop-by-hop headers that should not be forwarded by proxies (RFC 2616/7230)
+    HOP_BY_HOP_HEADERS = %w[
+      CONNECTION
+      KEEP-ALIVE
+      PROXY-AUTHENTICATE
+      PROXY-AUTHORIZATION
+      TE
+      TRAILERS
+      TRANSFER-ENCODING
+      UPGRADE
+    ].freeze
+
     def initialize(origin, cache, resource_id_pattern: DEFAULT_RESOURCE_ID_PATTERN)
       @origin = origin
       @cache = cache
@@ -231,8 +243,8 @@ module CachingProxy
       env.each do |key, value|
         if key.start_with?('HTTP_')
           header_name = key[5..-1].tr('_', '-')
-          # Skip headers that should not be forwarded
-          next if %w[HOST CONNECTION].include?(header_name.upcase)
+          # Skip hop-by-hop headers and host header (will be set by Net::HTTP)
+          next if hop_by_hop_header?(header_name) || header_name.upcase == 'HOST'
           request[header_name] = value
         elsif %w[CONTENT_TYPE CONTENT_LENGTH].include?(key)
           request[key.tr('_', '-')] = value
@@ -287,9 +299,16 @@ module CachingProxy
       end
     end
 
+    def hop_by_hop_header?(header_name)
+      HOP_BY_HOP_HEADERS.include?(header_name.to_s.upcase)
+    end
+
     def extract_headers(response)
       headers = {}
-      response.each_header { |k, v| headers[k] = v if k.to_s.downcase != 'transfer-encoding' }
+      response.each_header do |k, v|
+        # Don't forward hop-by-hop headers back to client
+        headers[k] = v unless hop_by_hop_header?(k)
+      end
       headers
     end
   end

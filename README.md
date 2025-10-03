@@ -188,6 +188,9 @@ curl -X POST "http://localhost:3000/__cache__/invalidate?pattern=*users*"
   - Distinguishes IDs from collection names (won't match `/users` as an ID)
 - **TTL**: Time-based expiration (configurable, respects max-age)
 - **Headers**: Respects HTTP cache-control headers (max-age, no-cache, no-store)
+- **HTTP Compliance**: Properly filters hop-by-hop headers per RFC 2616/7230:
+  - Filters out: `Connection`, `Keep-Alive`, `Proxy-Authorization`, `TE`, `Trailers`, `Transfer-Encoding`, `Upgrade`, `Proxy-Authenticate`
+  - Ensures clean request/response forwarding without connection-specific headers
 
 ## Development
 

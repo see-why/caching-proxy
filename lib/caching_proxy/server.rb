@@ -11,7 +11,20 @@ module CachingProxy
     # - Alphanumeric with numbers: abc123, user_123, item-456
     # - Numeric: 123, 456
     # - Must contain either a number, underscore, or hyphen to distinguish from collection names
-    DEFAULT_RESOURCE_ID_PATTERN = %r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}
+    # Regex pattern for resource IDs:
+    # - Starts with a slash
+    # - May have zero or more alphanumeric characters
+    # - Must contain at least one digit, underscore, or hyphen (to distinguish from collection names)
+    # - May have additional alphanumeric, underscore, or hyphen characters
+    # - Optional trailing slash
+    DEFAULT_RESOURCE_ID_PATTERN = %r{
+      /                # Starts with a slash
+      [a-zA-Z0-9]*     # Zero or more alphanumeric characters
+      [0-9_-]+         # At least one digit, underscore, or hyphen
+      [a-zA-Z0-9_-]*   # Zero or more alphanumeric, underscore, or hyphen characters
+      /?               # Optional trailing slash
+      $                # End of string
+    }x
 
     # Hop-by-hop headers that should not be forwarded by proxies (RFC 2616/7230)
     HOP_BY_HOP_HEADERS = %w[

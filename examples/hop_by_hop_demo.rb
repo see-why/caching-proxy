@@ -25,7 +25,7 @@ puts
 puts "Testing header filtering logic:"
 test_headers = [
   'Content-Type',      # Should pass through
-  'Authorization',     # Should pass through  
+  'Authorization',     # Should pass through
   'Connection',        # Should be filtered
   'Transfer-Encoding', # Should be filtered
   'User-Agent',        # Should pass through
@@ -46,6 +46,6 @@ end
 puts
 puts "The proxy ensures clean HTTP communication by:"
 puts "* Removing connection-specific headers from requests"
-puts "* Filtering hop-by-hop headers from responses"  
+puts "* Filtering hop-by-hop headers from responses"
 puts "* Maintaining RFC compliance for proper proxy behavior"
 puts "* Preventing header pollution between client-proxy-origin"

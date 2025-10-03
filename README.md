@@ -4,10 +4,13 @@ A lightweight HTTP caching proxy server built in Ruby that sits between clients 
 
 ## Features
 
-- **HTTP Proxy**: Forward requests to origin servers
+- **HTTP Proxy**: Forward all HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS) to origin servers
 - **Response Caching**: Cache successful responses to reduce load on origin servers
-- **Cache Management**: Intelligent cache invalidation and storage
+- **Smart Cache Invalidation**: Automatically invalidate cache on data-modifying operations
+- **Cache Management**: Manual cache invalidation and storage with pattern matching
+- **HTTP Cache-Control**: Respects standard HTTP caching headers (max-age, no-cache, no-store)
 - **Command Line Interface**: Easy-to-use CLI for configuration and management
+- **Admin API**: RESTful endpoints for cache management
 - **Lightweight**: Built with minimal dependencies using Rack and WEBrick
 
 ## Installation
@@ -69,14 +72,27 @@ ruby bin/caching_proxy.rb --port 3000 --origin https://jsonplaceholder.typicode.
 ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com --cache-dir /tmp/proxy-cache
 ```
 
-3. **Test the proxy**:
+3. **Test the proxy with different HTTP methods**:
 
 ```bash
-# First request (cache miss)
+# GET request (cached)
 curl -i http://localhost:3000/posts/1
 
-# Second request (cache hit)
+# Second GET request (cache hit)
 curl -i http://localhost:3000/posts/1
+
+# POST request (not cached, may invalidate related cache)
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"title": "New Post"}' \
+  http://localhost:3000/posts
+
+# PUT request (not cached, invalidates related cache)
+curl -X PUT -H "Content-Type: application/json" \
+  -d '{"title": "Updated Post"}' \
+  http://localhost:3000/posts/1
+
+# DELETE request (not cached, invalidates related cache)
+curl -X DELETE http://localhost:3000/posts/1
 ```
 
 ### Cache Management
@@ -156,10 +172,25 @@ curl -X POST "http://localhost:3000/__cache__/invalidate?pattern=*users*"
 
 ## Cache Strategy
 
-- **Storage**: File-based caching system
-- **Key Generation**: Based on request URL and method
-- **Invalidation**: Time-based expiration (configurable)
-- **Headers**: Respects cache-control headers from origin servers
+- **Storage**: In-memory caching system with TTL support
+- **Key Generation**: Based on HTTP method and request URL (`METHOD:URL`)
+- **Method-Specific Caching**:
+  - **GET, HEAD, OPTIONS**: Cached by default
+  - **POST, PUT, DELETE, PATCH**: Not cached, but trigger cache invalidation
+- **Smart Invalidation**: 
+  - POST to `/users` invalidates `GET:/users/*`
+  - PUT/DELETE to `/users/1` invalidates `GET:/users/1` and `GET:/users/*`
+- **Flexible Resource ID Detection**: Automatically recognizes various ID formats:
+  - Numeric IDs: `/users/123`
+  - Alphanumeric with numbers: `/users/abc123`, `/users/user_123`
+  - UUIDs: `/users/123e4567-e89b-12d3-a456-426614174000`
+  - Complex patterns: `/items/2023_report_v1`, `/docs/doc-v2-final`
+  - Distinguishes IDs from collection names (won't match `/users` as an ID)
+- **TTL**: Time-based expiration (configurable, respects max-age)
+- **Headers**: Respects HTTP cache-control headers (max-age, no-cache, no-store)
+- **HTTP Compliance**: Properly filters hop-by-hop headers per RFC 2616/7230:
+  - Filters out: `Connection`, `Keep-Alive`, `Proxy-Authorization`, `TE`, `Trailers`, `Transfer-Encoding`, `Upgrade`, `Proxy-Authenticate`
+  - Ensures clean request/response forwarding without connection-specific headers
 
 ## Development
 
@@ -221,6 +252,43 @@ The proxy logs important events including:
 - Request forwarding
 - Error conditions
 - Server start/stop events
+
+## Programmatic Usage
+
+You can also use the caching proxy programmatically in your Ruby applications:
+
+```ruby
+require_relative 'lib/caching_proxy/server'
+require_relative 'lib/caching_proxy/cache'
+
+# Basic usage
+cache = CachingProxy::Cache.new(300) # 5 minute TTL
+server = CachingProxy::Server.new('http://example.com', cache)
+
+# Custom resource ID pattern for specific use cases
+# Example: Only match numeric IDs
+numeric_pattern = %r{/[0-9]+/?$}
+server = CachingProxy::Server.new('http://example.com', cache, 
+                                  resource_id_pattern: numeric_pattern)
+
+# Example: Match specific ID formats (e.g., prefixed IDs)
+prefixed_pattern = %r{/(user|post|item)_[a-zA-Z0-9]+/?$}
+server = CachingProxy::Server.new('http://example.com', cache, 
+                                  resource_id_pattern: prefixed_pattern)
+
+# Start the server
+require 'rackup/handler/webrick'
+Rackup::Handler::WEBrick.run(server, Port: 8080)
+```
+
+### Custom Resource ID Patterns
+
+The default pattern recognizes most common ID formats, but you can customize it for specific needs:
+
+- **Default**: `%r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}` - Matches IDs containing numbers, underscores, or hyphens
+- **Numeric only**: `%r{/[0-9]+/?$}` - Only numeric IDs like `/users/123`
+- **UUID only**: `%r{/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/?$}` - UUID format
+- **Prefixed**: `%r{/prefix_[a-zA-Z0-9]+/?$}` - IDs with specific prefixes
 
 ## License
 

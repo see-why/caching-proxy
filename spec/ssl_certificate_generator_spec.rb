@@ -5,22 +5,20 @@ require 'fileutils'
 require 'stringio'
 require_relative '../lib/caching_proxy/ssl_certificate_generator'
 
-def capture(stream)
-  begin
-    stream = stream.to_s
-    eval("$#{stream} = StringIO.new")
-    yield
-    result = eval("$#{stream}").string
-  ensure
-    eval("$#{stream} = #{stream.upcase}")
-  end
-  result
-end
-
 RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
   let(:temp_dir) { Dir.mktmpdir }
   let(:cert_file) { File.join(temp_dir, 'test.crt') }
   let(:key_file) { File.join(temp_dir, 'test.key') }
+
+  # Safe output capturing helper
+  def capture_stdout
+    original_stdout = $stdout
+    $stdout = StringIO.new
+    yield
+    $stdout.string
+  ensure
+    $stdout = original_stdout
+  end
 
   after do
     FileUtils.rm_rf(temp_dir)
@@ -142,7 +140,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
     end
 
     it 'displays certificate information' do
-      output = capture(:stdout) do
+      output = capture_stdout do
         CachingProxy::SSLCertificateGenerator.certificate_info(cert_file)
       end
 

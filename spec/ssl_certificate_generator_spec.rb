@@ -157,7 +157,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
       output = capture_stdout do
         CachingProxy::SSLCertificateGenerator.certificate_info('nonexistent.crt')
       end
-      
+
       expect(output).to include("Error: Certificate file 'nonexistent.crt' does not exist")
     end
 
@@ -193,7 +193,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
         cert_file: 'test.crt',
         key_file: 'test.key'
       )
-      
+
       invalid_cert_file = File.join(temp_dir, 'invalid.crt')
       File.write(invalid_cert_file, 'This is not a valid certificate')
 
@@ -212,7 +212,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
         cert_file: 'test.crt',
         key_file: 'test.key'
       )
-      
+
       invalid_key_file = File.join(temp_dir, 'invalid.key')
       File.write(invalid_key_file, 'This is not a valid private key')
 
@@ -231,7 +231,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
         cert_file: 'test.crt',
         key_file: 'test.key'
       )
-      
+
       empty_cert_file = File.join(temp_dir, 'empty.crt')
       File.write(empty_cert_file, '')
 
@@ -250,7 +250,7 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
         cert_file: 'test.crt',
         key_file: 'test.key'
       )
-      
+
       empty_key_file = File.join(temp_dir, 'empty.key')
       File.write(empty_key_file, '')
 

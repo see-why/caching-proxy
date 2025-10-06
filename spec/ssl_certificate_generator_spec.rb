@@ -149,12 +149,117 @@ RSpec.describe 'CachingProxy::SSLCertificateGenerator' do
       expect(output).to include('CN=info.test.com')
       expect(output).to include('Subject Alt Names:')
       expect(output).to include('DNS:info.test.com')
+      expect(output).to include('Status: VALID')
+      expect(output).to include('Key Algorithm: RSA (2048 bits)')
     end
 
     it 'handles non-existent certificate file gracefully' do
-      expect do
+      output = capture_stdout do
         CachingProxy::SSLCertificateGenerator.certificate_info('nonexistent.crt')
-      end.not_to raise_error
+      end
+      
+      expect(output).to include("Error: Certificate file 'nonexistent.crt' does not exist")
+    end
+
+    it 'handles invalid certificate file content gracefully' do
+      invalid_cert_file = File.join(temp_dir, 'invalid.crt')
+      File.write(invalid_cert_file, 'This is not a valid certificate')
+
+      output = capture_stdout do
+        CachingProxy::SSLCertificateGenerator.certificate_info(invalid_cert_file)
+      end
+
+      expect(output).to include("Error: Invalid certificate file")
+      expect(output).to include("corrupted or not in PEM/DER format")
+    end
+
+    it 'handles empty certificate file gracefully' do
+      empty_cert_file = File.join(temp_dir, 'empty.crt')
+      File.write(empty_cert_file, '')
+
+      output = capture_stdout do
+        CachingProxy::SSLCertificateGenerator.certificate_info(empty_cert_file)
+      end
+
+      expect(output).to include("Error: Invalid certificate file")
+    end
+  end
+
+  describe '.verify_certificate error handling' do
+    it 'handles invalid certificate file content gracefully' do
+      # Create valid key but invalid certificate
+      CachingProxy::SSLCertificateGenerator.generate_self_signed(
+        output_dir: temp_dir,
+        cert_file: 'test.crt',
+        key_file: 'test.key'
+      )
+      
+      invalid_cert_file = File.join(temp_dir, 'invalid.crt')
+      File.write(invalid_cert_file, 'This is not a valid certificate')
+
+      output = capture_stdout do
+        result = CachingProxy::SSLCertificateGenerator.verify_certificate(invalid_cert_file, key_file)
+        expect(result).to be false
+      end
+
+      expect(output).to include("Error: Invalid certificate file")
+    end
+
+    it 'handles invalid private key file content gracefully' do
+      # Create valid certificate but invalid key
+      CachingProxy::SSLCertificateGenerator.generate_self_signed(
+        output_dir: temp_dir,
+        cert_file: 'test.crt',
+        key_file: 'test.key'
+      )
+      
+      invalid_key_file = File.join(temp_dir, 'invalid.key')
+      File.write(invalid_key_file, 'This is not a valid private key')
+
+      output = capture_stdout do
+        result = CachingProxy::SSLCertificateGenerator.verify_certificate(cert_file, invalid_key_file)
+        expect(result).to be false
+      end
+
+      expect(output).to include("Error: Invalid private key file")
+    end
+
+    it 'handles empty certificate file gracefully' do
+      # Create valid key but empty certificate
+      CachingProxy::SSLCertificateGenerator.generate_self_signed(
+        output_dir: temp_dir,
+        cert_file: 'test.crt',
+        key_file: 'test.key'
+      )
+      
+      empty_cert_file = File.join(temp_dir, 'empty.crt')
+      File.write(empty_cert_file, '')
+
+      output = capture_stdout do
+        result = CachingProxy::SSLCertificateGenerator.verify_certificate(empty_cert_file, key_file)
+        expect(result).to be false
+      end
+
+      expect(output).to include("Error: Invalid certificate file")
+    end
+
+    it 'handles empty private key file gracefully' do
+      # Create valid certificate but empty key
+      CachingProxy::SSLCertificateGenerator.generate_self_signed(
+        output_dir: temp_dir,
+        cert_file: 'test.crt',
+        key_file: 'test.key'
+      )
+      
+      empty_key_file = File.join(temp_dir, 'empty.key')
+      File.write(empty_key_file, '')
+
+      output = capture_stdout do
+        result = CachingProxy::SSLCertificateGenerator.verify_certificate(cert_file, empty_key_file)
+        expect(result).to be false
+      end
+
+      expect(output).to include("Error: Invalid private key file")
     end
   end
 end

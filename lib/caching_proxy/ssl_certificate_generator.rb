@@ -78,9 +78,36 @@ module CachingProxy
       return false unless File.exist?(cert_file) && File.exist?(key_file)
 
       begin
-        cert = OpenSSL::X509::Certificate.new(File.read(cert_file))
-        key = OpenSSL::PKey.read(File.read(key_file))
+        # Read and parse certificate file
+        cert_data = File.read(cert_file)
+        cert = OpenSSL::X509::Certificate.new(cert_data)
+      rescue OpenSSL::X509::CertificateError => e
+        puts "Error: Invalid certificate file '#{cert_file}': #{e.message}"
+        return false
+      rescue Errno::EACCES => e
+        puts "Error: Cannot read certificate file '#{cert_file}': #{e.message}"
+        return false
+      rescue => e
+        puts "Error: Failed to read certificate file '#{cert_file}': #{e.message}"
+        return false
+      end
 
+      begin
+        # Read and parse private key file
+        key_data = File.read(key_file)
+        key = OpenSSL::PKey.read(key_data)
+      rescue OpenSSL::PKey::PKeyError => e
+        puts "Error: Invalid private key file '#{key_file}': #{e.message}"
+        return false
+      rescue Errno::EACCES => e
+        puts "Error: Cannot read private key file '#{key_file}': #{e.message}"
+        return false
+      rescue => e
+        puts "Error: Failed to read private key file '#{key_file}': #{e.message}"
+        return false
+      end
+
+      begin
         # Verify certificate and key match
         unless cert.public_key.to_pem == key.public_key.to_pem
           puts "Error: SSL certificate and private key don't match"
@@ -101,26 +128,62 @@ module CachingProxy
 
         true
       rescue OpenSSL::OpenSSLError => e
-        puts "SSL certificate verification failed: #{e.message}"
+        puts "Error: SSL certificate verification failed: #{e.message}"
+        false
+      rescue => e
+        puts "Error: Unexpected error during certificate verification: #{e.message}"
         false
       end
     end
 
     def self.certificate_info(cert_file)
-      return unless File.exist?(cert_file)
+      unless File.exist?(cert_file)
+        puts "Error: Certificate file '#{cert_file}' does not exist"
+        return
+      end
 
-      cert = OpenSSL::X509::Certificate.new(File.read(cert_file))
+      begin
+        cert_data = File.read(cert_file)
+        cert = OpenSSL::X509::Certificate.new(cert_data)
 
-      puts "SSL Certificate Information:"
-      puts "  Subject: #{cert.subject}"
-      puts "  Issuer: #{cert.issuer}"
-      puts "  Valid from: #{cert.not_before}"
-      puts "  Valid until: #{cert.not_after}"
-      puts "  Serial: #{cert.serial}"
+        puts "SSL Certificate Information:"
+        puts "  Subject: #{cert.subject}"
+        puts "  Issuer: #{cert.issuer}"
+        puts "  Valid from: #{cert.not_before}"
+        puts "  Valid until: #{cert.not_after}"
+        puts "  Serial: #{cert.serial}"
 
-      san_extension = cert.extensions.find { |ext| ext.oid == 'subjectAltName' }
-      if san_extension
-        puts "  Subject Alt Names: #{san_extension.value}"
+        # Check expiration status
+        if cert.not_after < Time.now
+          puts "  Status: EXPIRED (#{cert.not_after})"
+        elsif cert.not_before > Time.now
+          puts "  Status: NOT YET VALID (starts #{cert.not_before})"
+        else
+          puts "  Status: VALID"
+        end
+
+        # Display Subject Alternative Names if present
+        san_extension = cert.extensions.find { |ext| ext.oid == 'subjectAltName' }
+        if san_extension
+          puts "  Subject Alt Names: #{san_extension.value}"
+        end
+
+        # Display key algorithm and size
+        public_key = cert.public_key
+        if public_key.respond_to?(:n) # RSA key
+          puts "  Key Algorithm: RSA (#{public_key.n.num_bits} bits)"
+        else
+          puts "  Key Algorithm: #{public_key.class}"
+        end
+
+      rescue OpenSSL::X509::CertificateError => e
+        puts "Error: Invalid certificate file '#{cert_file}': #{e.message}"
+        puts "The file may be corrupted or not in PEM/DER format"
+      rescue Errno::EACCES => e
+        puts "Error: Cannot read certificate file '#{cert_file}': #{e.message}"
+        puts "Check file permissions"
+      rescue => e
+        puts "Error: Failed to read certificate information from '#{cert_file}': #{e.message}"
       end
     end
   end

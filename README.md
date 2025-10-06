@@ -4,7 +4,8 @@ A lightweight HTTP caching proxy server built in Ruby that sits between clients 
 
 ## Features
 
-- **HTTP Proxy**: Forward all HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS) to origin servers
+- **HTTP/HTTPS Proxy**: Forward all HTTP methods with support for both HTTP and HTTPS
+- **SSL Termination**: Built-in HTTPS support with automatic self-signed certificate generation
 - **Response Caching**: Cache successful responses to reduce load on origin servers
 - **Smart Cache Invalidation**: Automatically invalidate cache on data-modifying operations
 - **Cache Management**: Manual cache invalidation and storage with pattern matching
@@ -48,8 +49,14 @@ ruby bin/caching_proxy.rb --port 3000 --origin http://example.com
 ### Command Line Options
 
 **Server Options:**
-- `--port PORT`: Port to run the proxy server on
+- `--port PORT`: Port to run the HTTP proxy server on
 - `--origin URL`: Origin server URL to proxy requests to
+
+**HTTPS/SSL Options:**
+- `--ssl`: Enable HTTPS/SSL support
+- `--ssl-port PORT`: HTTPS port (default: 8443)
+- `--ssl-cert PATH`: Path to SSL certificate file (.crt or .pem)
+- `--ssl-key PATH`: Path to SSL private key file (.key or .pem)
 
 **Cache Management Options:**
 - `--clear-cache`: Clear all cached entries
@@ -66,10 +73,17 @@ ruby bin/caching_proxy.rb --port 3000 --origin http://example.com
 ruby bin/caching_proxy.rb --port 3000 --origin https://jsonplaceholder.typicode.com
 ```
 
-2. **Custom cache directory**:
+2. **HTTPS proxy with SSL termination**:
 
 ```bash
-ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com --cache-dir /tmp/proxy-cache
+# Automatically generates self-signed certificate
+ruby bin/caching_proxy.rb --ssl --origin https://api.example.com
+
+# Use custom SSL certificate
+ruby bin/caching_proxy.rb --ssl --ssl-cert server.crt --ssl-key server.key --origin https://api.example.com
+
+# Run both HTTP and HTTPS simultaneously
+ruby bin/caching_proxy.rb --port 8080 --ssl --ssl-port 8443 --origin https://api.example.com
 ```
 
 3. **Test the proxy with different HTTP methods**:
@@ -93,6 +107,30 @@ curl -X PUT -H "Content-Type: application/json" \
 
 # DELETE request (not cached, invalidates related cache)
 curl -X DELETE http://localhost:3000/posts/1
+```
+
+4. **Test HTTPS proxy** (use `-k` to ignore self-signed certificate warnings):
+
+```bash
+# HTTPS GET request
+curl -k -i https://localhost:8443/posts/1
+
+# HTTPS POST request
+curl -k -X POST -H "Content-Type: application/json" \
+  -d '{"title": "HTTPS Post"}' \
+  https://localhost:8443/posts
+```
+
+### SSL Certificate Management
+
+The proxy automatically generates self-signed certificates when SSL is enabled:
+
+```bash
+# View certificate information
+openssl x509 -in server.crt -text -noout
+
+# Trust certificate on macOS (optional, for development)
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain server.crt
 ```
 
 ### Cache Management
@@ -276,9 +314,30 @@ prefixed_pattern = %r{/(user|post|item)_[a-zA-Z0-9]+/?$}
 server = CachingProxy::Server.new('http://example.com', cache, 
                                   resource_id_pattern: prefixed_pattern)
 
-# Start the server
+# Start HTTP server
 require 'rackup/handler/webrick'
 Rackup::Handler::WEBrick.run(server, Port: 8080)
+
+# SSL/HTTPS Support
+require_relative 'lib/caching_proxy/ssl_certificate_generator'
+
+# Generate SSL certificate if needed
+cert_info = CachingProxy::SSLCertificateGenerator.generate_self_signed(
+  hostname: 'localhost',
+  cert_file: 'server.crt',
+  key_file: 'server.key'
+)
+
+# Start HTTPS server
+ssl_options = {
+  Port: 8443,
+  SSLEnable: true,
+  SSLCertificate: OpenSSL::X509::Certificate.new(File.read('server.crt')),
+  SSLPrivateKey: OpenSSL::PKey.read(File.read('server.key')),
+  SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE
+}
+
+Rackup::Handler::WEBrick.run(server, **ssl_options)
 ```
 
 ### Custom Resource ID Patterns

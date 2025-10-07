@@ -1,369 +1,209 @@
 # Caching Proxy
 
-A lightweight HTTP caching proxy server built in Ruby that sits between clients and origin servers to cache responses and improve performance.
+A high-performance HTTP/HTTPS caching proxy server built in Ruby with support for multiple persistent cache backends.
 
 ## Features
 
-- **HTTP/HTTPS Proxy**: Forward all HTTP methods with support for both HTTP and HTTPS
-- **SSL Termination**: Built-in HTTPS support with automatic self-signed certificate generation
-- **Response Caching**: Cache successful responses to reduce load on origin servers
-- **Smart Cache Invalidation**: Automatically invalidate cache on data-modifying operations
-- **Cache Management**: Manual cache invalidation and storage with pattern matching
-- **HTTP Cache-Control**: Respects standard HTTP caching headers (max-age, no-cache, no-store)
-- **Command Line Interface**: Easy-to-use CLI for configuration and management
-- **Admin API**: RESTful endpoints for cache management
-- **Lightweight**: Built with minimal dependencies using Rack and WEBrick
+- **HTTP/HTTPS Proxy**: Complete proxy functionality with SSL/TLS support
+- **Multi-Backend Caching**: Memory, Redis, and SQLite cache backends with automatic failover
+- **Persistent Storage**: Cache survives server restarts with Redis and SQLite backends
+- **Smart Invalidation**: Pattern-based cache clearing with wildcard support
+- **SSL Certificate Management**: Automatic self-signed certificate generation or custom certificates
+- **Cache Statistics**: Comprehensive monitoring and performance metrics
+- **Production Ready**: Error handling, connection pooling, and graceful degradation
+
+## Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/see-why/caching-proxy.git
+cd caching-proxy
+bundle install
+
+# Basic usage
+ruby bin/caching_proxy.rb --port 8080 --origin https://httpbin.org
+
+# With persistent cache
+ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com --cache-backend sqlite
+```
 
 ## Installation
 
 ### Prerequisites
-
 - Ruby 3.0 or higher
 - Bundler
 
 ### Setup
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/see-why/caching-proxy.git
-cd caching-proxy
-```
-
-2. Install dependencies:
-
 ```bash
 bundle install
 ```
 
+For persistent backends:
+- **Redis**: Optional, for distributed caching
+- **SQLite3**: Included with Ruby, for local persistence
+
 ## Usage
-
-### Basic Usage
-
-Start the caching proxy server:
-
-```bash
-ruby bin/caching_proxy.rb --port 3000 --origin http://example.com
-```
 
 ### Command Line Options
 
-**Server Options:**
-- `--port PORT`: Port to run the HTTP proxy server on
-- `--origin URL`: Origin server URL to proxy requests to
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-p, --port PORT` | Server port | 3000 |
+| `-o, --origin URL` | Origin server URL | Required |
+| `--cache-backend BACKEND` | Cache type (memory/redis/sqlite) | memory |
+| `--cache-ttl TTL` | Cache TTL in seconds | 3600 |
+| `--cache-db PATH` | SQLite database file | cache.db |
+| `--cache-redis-host HOST` | Redis host | localhost |
+| `--cache-redis-port PORT` | Redis port | 6379 |
+| `--cert FILE` | SSL certificate file | - |
+| `--key FILE` | SSL private key file | - |
+| `--skip-ssl-verify` | Skip upstream SSL verification | false |
+| `--clear-cache` | Clear cache on startup | false |
+| `--cache-info` | Show cache backend info | - |
 
-**HTTPS/SSL Options:**
-- `--ssl`: Enable HTTPS/SSL support
-- `--ssl-port PORT`: HTTPS port (default: 8443)
-- `--ssl-cert PATH`: Path to SSL certificate file (.crt or .pem)
-- `--ssl-key PATH`: Path to SSL private key file (.key or .pem)
+### Cache Backends
 
-**Cache Management Options:**
-- `--clear-cache`: Clear all cached entries
-- `--invalidate-key KEY`: Invalidate a specific cache key
-- `--invalidate-pattern PATTERN`: Invalidate keys matching pattern (supports * and ?)
-- `--cache-stats`: Show cache statistics
-- `--cache-keys`: List all cache keys
+#### Memory Cache (Default)
+```bash
+ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com
+```
+- ✅ Ultra-fast access
+- ❌ No persistence
 
-### Examples
+#### SQLite Cache (Single Server)
+```bash
+ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com \
+  --cache-backend sqlite --cache-db production.db
+```
+- ✅ Local persistence
+- ✅ Zero configuration
+- ❌ Single node only
 
-1. **Basic proxy with caching**:
+#### Redis Cache (Production)
+```bash
+ruby bin/caching_proxy.rb --port 8080 --origin https://api.example.com \
+  --cache-backend redis --cache-redis-host redis.example.com
+```
+- ✅ Distributed caching
+- ✅ High performance
+- ✅ Clustering support
+- ❌ Requires Redis server
+
+### HTTPS/SSL Support
 
 ```bash
-ruby bin/caching_proxy.rb --port 3000 --origin https://jsonplaceholder.typicode.com
+# Auto-generated self-signed certificate
+ruby bin/caching_proxy.rb --port 8443 --origin https://api.example.com \
+  --cert server.crt --key server.key
+
+# Skip SSL verification for development
+ruby bin/caching_proxy.rb --origin https://self-signed.example.com --skip-ssl-verify
 ```
 
-2. **HTTPS proxy with SSL termination**:
+## Testing
 
 ```bash
-# Automatically generates self-signed certificate
-ruby bin/caching_proxy.rb --ssl --origin https://api.example.com
+# First request (cache miss)
+curl -v http://localhost:8080/api/users
+# X-Cache: MISS
 
-# Use custom SSL certificate
-ruby bin/caching_proxy.rb --ssl --ssl-cert server.crt --ssl-key server.key --origin https://api.example.com
+# Second request (cache hit)  
+curl -v http://localhost:8080/api/users
+# X-Cache: HIT
 
-# Run both HTTP and HTTPS simultaneously
-ruby bin/caching_proxy.rb --port 8080 --ssl --ssl-port 8443 --origin https://api.example.com
+# Check available backends
+ruby bin/caching_proxy.rb --cache-info
 ```
-
-3. **Test the proxy with different HTTP methods**:
-
-```bash
-# GET request (cached)
-curl -i http://localhost:3000/posts/1
-
-# Second GET request (cache hit)
-curl -i http://localhost:3000/posts/1
-
-# POST request (not cached, may invalidate related cache)
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"title": "New Post"}' \
-  http://localhost:3000/posts
-
-# PUT request (not cached, invalidates related cache)
-curl -X PUT -H "Content-Type: application/json" \
-  -d '{"title": "Updated Post"}' \
-  http://localhost:3000/posts/1
-
-# DELETE request (not cached, invalidates related cache)
-curl -X DELETE http://localhost:3000/posts/1
-```
-
-4. **Test HTTPS proxy** (use `-k` to ignore self-signed certificate warnings):
-
-```bash
-# HTTPS GET request
-curl -k -i https://localhost:8443/posts/1
-
-# HTTPS POST request
-curl -k -X POST -H "Content-Type: application/json" \
-  -d '{"title": "HTTPS Post"}' \
-  https://localhost:8443/posts
-```
-
-### SSL Certificate Management
-
-The proxy automatically generates self-signed certificates when SSL is enabled:
-
-```bash
-# View certificate information
-openssl x509 -in server.crt -text -noout
-
-# Trust certificate on macOS (optional, for development)
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain server.crt
-```
-
-### Cache Management
-
-1. **Clear all cache**:
-```bash
-ruby bin/caching_proxy.rb --clear-cache
-```
-
-2. **Invalidate specific key**:
-```bash
-ruby bin/caching_proxy.rb --invalidate-key "https://api.example.com/posts/1"
-```
-
-3. **Invalidate keys by pattern**:
-```bash
-# Invalidate all user-related endpoints
-ruby bin/caching_proxy.rb --invalidate-pattern "*users*"
-
-# Invalidate specific post patterns
-ruby bin/caching_proxy.rb --invalidate-pattern "*/posts/?"
-```
-
-4. **View cache statistics**:
-```bash
-ruby bin/caching_proxy.rb --cache-stats
-```
-
-5. **List all cache keys**:
-```bash
-ruby bin/caching_proxy.rb --cache-keys
-```
-
-### Admin Endpoints
-
-When the proxy server is running, you can also manage the cache via HTTP endpoints:
-
-```bash
-# Get cache statistics
-curl http://localhost:3000/__cache__/stats
-
-# List all cache keys
-curl http://localhost:3000/__cache__/keys
-
-# Clear all cache
-curl -X POST http://localhost:3000/__cache__/clear
-
-# Invalidate specific key
-curl -X POST "http://localhost:3000/__cache__/invalidate?key=https://api.example.com/posts/1"
-
-# Invalidate by pattern
-curl -X POST "http://localhost:3000/__cache__/invalidate?pattern=*users*"
-```
-
-## How It Works
-
-1. **Request Interception**: The proxy receives HTTP requests from clients
-2. **Cache Check**: Checks if a cached response exists for the request
-3. **Cache Hit**: If cached, returns the stored response immediately
-4. **Cache Miss**: If not cached, forwards the request to the origin server
-5. **Response Caching**: Stores successful responses in the cache for future requests
-6. **Response Delivery**: Returns the response to the client
 
 ## Architecture
 
 ```text
-├── bin/
-│   └── caching_proxy.rb    # Main executable script
-├── lib/
-│   └── caching_proxy/
-│       ├── cli.rb          # Command line interface
-│       ├── server.rb       # HTTP server implementation
-│       └── cache.rb        # Cache management logic
-├── Gemfile                 # Ruby dependencies
-└── README.md              # This file
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│     Client      │───▶│  Caching Proxy   │───▶│  Origin Server  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │  Cache Backend   │
+                    │ ┌──────────────┐ │
+                    │ │    Memory    │ │
+                    │ │    Redis     │ │
+                    │ │   SQLite     │ │
+                    │ └──────────────┘ │
+                    └──────────────────┘
 ```
 
-## Cache Strategy
+### Core Components
+- **CLI** (`lib/caching_proxy/cli.rb`): Command-line interface
+- **Server** (`lib/caching_proxy/server.rb`): HTTP/HTTPS request handling  
+- **Cache Factory** (`lib/caching_proxy/cache_factory.rb`): Backend selection with failover
 
-- **Storage**: In-memory caching system with TTL support
-- **Key Generation**: Based on HTTP method and request URL (`METHOD:URL`)
-- **Method-Specific Caching**:
-  - **GET, HEAD, OPTIONS**: Cached by default
-  - **POST, PUT, DELETE, PATCH**: Not cached, but trigger cache invalidation
-- **Smart Invalidation**: 
-  - POST to `/users` invalidates `GET:/users/*`
-  - PUT/DELETE to `/users/1` invalidates `GET:/users/1` and `GET:/users/*`
-- **Flexible Resource ID Detection**: Automatically recognizes various ID formats:
-  - Numeric IDs: `/users/123`
-  - Alphanumeric with numbers: `/users/abc123`, `/users/user_123`
-  - UUIDs: `/users/123e4567-e89b-12d3-a456-426614174000`
-  - Complex patterns: `/items/2023_report_v1`, `/docs/doc-v2-final`
-  - Distinguishes IDs from collection names (won't match `/users` as an ID)
-- **TTL**: Time-based expiration (configurable, respects max-age)
-- **Headers**: Respects HTTP cache-control headers (max-age, no-cache, no-store)
-- **HTTP Compliance**: Properly filters hop-by-hop headers per RFC 2616/7230:
-  - Filters out: `Connection`, `Keep-Alive`, `Proxy-Authorization`, `TE`, `Trailers`, `Transfer-Encoding`, `Upgrade`, `Proxy-Authenticate`
-  - Ensures clean request/response forwarding without connection-specific headers
+### Cache Strategy
+- **Caching**: GET, HEAD, OPTIONS requests
+- **Invalidation**: POST, PUT, DELETE, PATCH trigger cache clearing
+- **TTL**: Configurable expiration times
+- **Patterns**: Wildcard invalidation (`/api/users/*`)
+
+## Performance
+
+| Backend | Speed | Persistence | Distribution | Setup |
+|---------|-------|-------------|--------------|-------|
+| Memory  | ⚡⚡⚡ | ❌ | Single | None |
+| SQLite  | ⚡⚡ | ✅ | Single | Minimal |
+| Redis   | ⚡⚡ | ✅ | Multi | Redis Server |
 
 ## Development
 
 ### Running Tests
-
 ```bash
-# Run the test suite
 bundle exec rspec
+bundle exec rspec spec/persistent_cache_spec.rb
 ```
 
 ### Contributing
-
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for your changes
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## Configuration
-
-The caching proxy can be configured through command line arguments or environment variables:
-
-| Option | Environment Variable | Default | Description |
-|--------|---------------------|---------|-------------|
-| `--port` | `PROXY_PORT` | 3000 | Port to run the server on |
-| `--origin` | `ORIGIN_URL` | - | Origin server URL (required) |
-| `--cache-dir` | `CACHE_DIR` | ./cache | Cache storage directory |
-
-## Performance
-
-- **Cache Hit Ratio**: Monitor cache effectiveness
-- **Response Times**: Significantly reduced for cached responses
-- **Memory Usage**: Efficient file-based storage
-- **Concurrent Requests**: Handles multiple simultaneous connections
+2. Create feature branch (`git checkout -b feature/new-feature`)
+3. Add tests and implement changes
+4. Submit pull request
 
 ## Troubleshooting
 
-### Common Issues
+### Redis Connection Issues
+```bash
+# Check Redis server
+redis-cli ping
 
-1. **Port already in use**:
-   - Change the port using `--port` option
-   - Check if another service is running on the same port
+# Start Redis
+redis-server
 
-2. **Origin server unreachable**:
-   - Verify the origin URL is correct and accessible
-   - Check network connectivity
-
-3. **Cache directory permissions**:
-   - Ensure the cache directory is writable
-   - Check file system permissions
-
-### Logs
-
-The proxy logs important events including:
-
-- Cache hits and misses
-- Request forwarding
-- Error conditions
-- Server start/stop events
-
-## Programmatic Usage
-
-You can also use the caching proxy programmatically in your Ruby applications:
-
-```ruby
-require_relative 'lib/caching_proxy/server'
-require_relative 'lib/caching_proxy/cache'
-
-# Basic usage
-cache = CachingProxy::Cache.new(300) # 5 minute TTL
-server = CachingProxy::Server.new('http://example.com', cache)
-
-# Custom resource ID pattern for specific use cases
-# Example: Only match numeric IDs
-numeric_pattern = %r{/[0-9]+/?$}
-server = CachingProxy::Server.new('http://example.com', cache, 
-                                  resource_id_pattern: numeric_pattern)
-
-# Example: Match specific ID formats (e.g., prefixed IDs)
-prefixed_pattern = %r{/(user|post|item)_[a-zA-Z0-9]+/?$}
-server = CachingProxy::Server.new('http://example.com', cache, 
-                                  resource_id_pattern: prefixed_pattern)
-
-# Start HTTP server
-require 'rackup/handler/webrick'
-Rackup::Handler::WEBrick.run(server, Port: 8080)
-
-# SSL/HTTPS Support
-require_relative 'lib/caching_proxy/ssl_certificate_generator'
-
-# Generate SSL certificate if needed
-cert_info = CachingProxy::SSLCertificateGenerator.generate_self_signed(
-  hostname: 'localhost',
-  cert_file: 'server.crt',
-  key_file: 'server.key'
-)
-
-# Start HTTPS server
-ssl_options = {
-  Port: 8443,
-  SSLEnable: true,
-  SSLCertificate: OpenSSL::X509::Certificate.new(File.read('server.crt')),
-  SSLPrivateKey: OpenSSL::PKey.read(File.read('server.key')),
-  SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE
-}
-
-Rackup::Handler::WEBrick.run(server, **ssl_options)
+# Test connection
+ruby bin/caching_proxy.rb --cache-backend redis --cache-info
 ```
 
-### Custom Resource ID Patterns
+### SSL Certificate Issues
+```bash
+# Generate self-signed certificate
+openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 365 -nodes
 
-The default pattern recognizes most common ID formats, but you can customize it for specific needs:
+# Test HTTPS
+curl -k https://localhost:8443/api/test
+```
 
-- **Default**: `%r{/[a-zA-Z0-9]*[0-9_-]+[a-zA-Z0-9_-]*/?$}` - Matches IDs containing numbers, underscores, or hyphens
-- **Numeric only**: `%r{/[0-9]+/?$}` - Only numeric IDs like `/users/123`
-- **UUID only**: `%r{/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/?$}` - UUID format
-- **Prefixed**: `%r{/prefix_[a-zA-Z0-9]+/?$}` - IDs with specific prefixes
+### SQLite Permission Issues
+```bash
+# Ensure directory is writable
+chmod 755 /path/to/cache/directory
+
+# Use absolute path
+ruby bin/caching_proxy.rb --cache-db /full/path/to/cache.db
+```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Author
+## Links
 
-Osita Cyril Iyadi
-
-## Acknowledgments
-
-- Built with Ruby's Rack framework
-- Uses WEBrick for HTTP server functionality
-- Inspired by modern caching proxy solutions
-- [Project URL](https://roadmap.sh/projects/caching-server)
-
----
-
-For more information, issues, or contributions, please visit the [GitHub repository](https://github.com/see-why/caching-proxy).
+- **Repository**: https://github.com/see-why/caching-proxy
+- **Issues**: https://github.com/see-why/caching-proxy/issues
+- **Project Specification**: https://roadmap.sh/projects/caching-server

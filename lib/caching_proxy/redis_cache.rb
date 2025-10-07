@@ -1,0 +1,125 @@
+# frozen_string_literal: true
+
+require_relative 'persistent_cache'
+
+module CachingProxy
+  class RedisCache < PersistentCache
+    def initialize(redis_url = nil, default_ttl = DEFAULT_TTL)
+      super(default_ttl)
+
+      begin
+        require 'redis'
+      rescue LoadError
+        raise LoadError, "Redis gem not found. Add 'gem \"redis\"' to your Gemfile"
+      end
+
+      @redis = Redis.new(url: redis_url || ENV['REDIS_URL'] || 'redis://localhost:6379')
+      @key_prefix = 'caching_proxy:'
+
+      # Test connection
+      @redis.ping
+      puts "Connected to Redis at #{@redis.connection[:host]}:#{@redis.connection[:port]}"
+    rescue Redis::CannotConnectError => e
+      raise "Cannot connect to Redis: #{e.message}"
+    end
+
+    def key?(key)
+      @redis.exists?("#{@key_prefix}#{key}") > 0
+    end
+
+    def get(key)
+      raw_value = @redis.get("#{@key_prefix}#{key}")
+      return nil unless raw_value
+
+      deserialize_value(raw_value)
+    rescue JSON::ParserError
+      # Handle legacy or corrupted data
+      invalidate(key)
+      nil
+    end
+
+    def set(key, value, ttl = nil)
+      ttl ||= @default_ttl
+      serialized_value = serialize_value(value)
+
+      if ttl > 0
+        @redis.setex("#{@key_prefix}#{key}", ttl, serialized_value)
+      else
+        @redis.set("#{@key_prefix}#{key}", serialized_value)
+      end
+    end
+
+    def invalidate(key)
+      @redis.del("#{@key_prefix}#{key}") > 0
+    end
+
+    def invalidate_pattern(pattern)
+      full_pattern = "#{@key_prefix}#{pattern}"
+      keys_to_delete = @redis.keys(full_pattern)
+
+      return [] if keys_to_delete.empty?
+
+      @redis.del(*keys_to_delete)
+      # Remove prefix from returned keys
+      keys_to_delete.map { |key| key.sub(@key_prefix, '') }
+    end
+
+    def keys
+      all_keys = @redis.keys("#{@key_prefix}*")
+      # Remove prefix from keys
+      all_keys.map { |key| key.sub(@key_prefix, '') }
+    end
+
+    def size
+      @redis.dbsize
+    end
+
+    def clear
+      # Only clear keys with our prefix to avoid affecting other applications
+      pattern_keys = @redis.keys("#{@key_prefix}*")
+      return 0 if pattern_keys.empty?
+
+      @redis.del(*pattern_keys)
+    end
+
+    def stats
+      info = @redis.info
+      super.merge({
+        redis_version: info['redis_version'],
+        used_memory: info['used_memory_human'],
+        connected_clients: info['connected_clients'],
+        total_commands_processed: info['total_commands_processed'],
+        keyspace_hits: info['keyspace_hits'],
+        keyspace_misses: info['keyspace_misses']
+      })
+    end
+
+    def close
+      @redis&.quit
+    rescue Redis::ConnectionError
+      # Connection already closed
+    end
+
+    private
+
+    def serialize_value(value)
+      # Store metadata along with value for better debugging
+      data = {
+        value: value,
+        stored_at: Time.now.to_f,
+        version: '1.0'
+      }
+      super(data)
+    end
+
+    def deserialize_value(serialized_value)
+      data = super(serialized_value)
+      # Handle both new format (with metadata) and legacy format
+      if data.is_a?(Hash) && data.key?('value')
+        data['value']
+      else
+        data
+      end
+    end
+  end
+end

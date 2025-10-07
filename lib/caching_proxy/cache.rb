@@ -67,6 +67,10 @@ module CachingProxy
       @store.clear
     end
 
+    def close
+      # No cleanup needed for in-memory cache
+    end
+
     private
 
     def expired?(entry)

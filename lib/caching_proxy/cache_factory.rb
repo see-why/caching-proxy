@@ -42,10 +42,10 @@ module CachingProxy
                   Cache.new(options[:default_ttl])
                 when 'redis'
                   require_relative 'redis_cache'
-                  RedisCache.new(options[:redis_url], options[:default_ttl])
+                  RedisCache.new(options[:redis_url], options[:default_ttl], logger: logger)
                 when 'sqlite'
                   require_relative 'sqlite_cache'
-                  SqliteCache.new(options[:database_path], options[:default_ttl])
+                  SqliteCache.new(options[:database_path], options[:default_ttl], logger: logger)
                 end
 
         CacheCreationResult.new(cache, backend)

@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require_relative 'persistent_cache'
+require 'logger'
 
 module CachingProxy
   class SqliteCache < PersistentCache
-    def initialize(database_path = nil, default_ttl = DEFAULT_TTL)
+    def initialize(database_path = nil, default_ttl = DEFAULT_TTL, logger: nil)
       super(default_ttl)
+      @logger = logger || default_logger
 
       begin
         require 'sqlite3'
@@ -18,7 +20,7 @@ module CachingProxy
       @db.results_as_hash = true
 
       create_table
-      puts "Using SQLite cache database: #{@database_path}"
+      @logger.info("SqliteCache: Using SQLite cache database: #{@database_path}")
     end
 
     def key?(key)
@@ -170,6 +172,17 @@ module CachingProxy
         data['value']
       else
         data
+      end
+    end
+
+    def default_logger
+      @default_logger ||= begin
+        logger = Logger.new($stderr)
+        logger.level = Logger::INFO
+        logger.formatter = proc do |severity, datetime, progname, msg|
+          "#{severity}: #{msg}\n"
+        end
+        logger
       end
     end
 

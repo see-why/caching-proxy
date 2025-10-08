@@ -7,13 +7,52 @@ require 'webrick'
 require 'rackup/handler/webrick'
 require 'openssl'
 require 'stringio'
+require 'logger'
 require 'caching_proxy/cli'
 require 'caching_proxy/server'
-require 'caching_proxy/cache'
+require 'caching_proxy/cache_factory'
 require 'caching_proxy/ssl_certificate_generator'
 
 options = CachingProxy::Cli.parse_args
-cache = CachingProxy::Cache.new
+
+# Show cache backend information and exit
+if options[:cache_info]
+  puts "Available Cache Backends:"
+  puts
+  CachingProxy::CacheFactory.backend_info.each do |backend, info|
+    available = CachingProxy::CacheFactory.supported_backends.include?(backend.to_s)
+    status = available ? "[Available]" : "[Not Available]"
+
+    puts "#{backend.to_s.upcase} #{status}"
+    puts "  #{info[:description]}"
+    puts "  Persistent: #{info[:persistent] ? 'Yes' : 'No'}"
+    puts "  Distributed: #{info[:distributed] ? 'Yes' : 'No'}"
+    unless info[:dependencies].empty?
+      puts "  Dependencies: #{info[:dependencies].join(', ')}"
+    end
+    puts
+  end
+  exit
+end
+
+# Initialize cache with specified backend
+cache_backend = options[:cache_backend] || 'memory'
+cache_options = {
+  default_ttl: options[:cache_ttl] || 300,
+  redis_url: options[:redis_url],
+  database_path: options[:cache_db],
+  logger: Logger.new($stderr)
+}
+
+result = CachingProxy::CacheFactory.create(cache_backend, cache_options)
+cache = result.cache
+
+# Inform user if fallback was used
+if result.fallback?
+  puts "Using #{result.backend_used} cache (fallback from #{cache_backend})"
+elsif result.backend_used != cache_backend
+  puts "Using #{result.backend_used} cache"
+end
 
 if options[:clear_cache]
   cache.clear
@@ -106,8 +145,16 @@ if (options[:port] || options[:ssl]) && options[:origin]
       }
 
       # Handle shutdown gracefully
-      trap('INT') { exit }
-      trap('TERM') { exit }
+      trap('INT') do
+        puts "\nShutting down..."
+        cache.close if cache.respond_to?(:close)
+        exit
+      end
+      trap('TERM') do
+        puts "\nShutting down..."
+        cache.close if cache.respond_to?(:close)
+        exit
+      end
 
       Rackup::Handler::WEBrick.run(app, **ssl_options)
     end
@@ -115,6 +162,9 @@ if (options[:port] || options[:ssl]) && options[:origin]
   rescue => e
     puts "Caching server error: #{e.message}"
     puts e.backtrace.join("\n") if ENV['DEBUG']
+  ensure
+    # Clean up cache connections
+    cache.close if cache.respond_to?(:close)
   end
 else
   puts "Missing --port or --ssl (with --origin)"

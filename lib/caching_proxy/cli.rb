@@ -52,6 +52,26 @@ module CachingProxy
         opts.on("--ssl-port PORT", Integer, "HTTPS port (default: 8443)") do |v|
           options[:ssl_port] = v
         end
+
+        opts.on("--cache-backend BACKEND", String, "Cache backend: memory, redis, sqlite (default: memory)") do |v|
+          options[:cache_backend] = v
+        end
+
+        opts.on("--redis-url URL", String, "Redis connection URL (default: redis://localhost:6379)") do |v|
+          options[:redis_url] = v
+        end
+
+        opts.on("--cache-db PATH", String, "SQLite database path for cache (default: cache.db)") do |v|
+          options[:cache_db] = v
+        end
+
+        opts.on("--cache-ttl SECONDS", Integer, "Default cache TTL in seconds (default: 300)") do |v|
+          options[:cache_ttl] = v
+        end
+
+        opts.on("--cache-info", "Show cache backend information") do
+          options[:cache_info] = true
+        end
       end.parse!
       options
     end

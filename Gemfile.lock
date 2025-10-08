@@ -4,7 +4,8 @@ GEM
     connection_pool (2.5.4)
     diff-lcs (1.6.2)
     dotenv (2.8.1)
-    rack (2.2.17)
+    mini_portile2 (2.8.9)
+    rack (2.2.19)
     redis (5.4.1)
       redis-client (>= 0.22.0)
     redis-client (0.26.1)
@@ -22,11 +23,14 @@ GEM
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
     rspec-support (3.13.4)
+    sqlite3 (1.7.3)
+      mini_portile2 (~> 2.8.0)
     sqlite3 (1.7.3-arm64-darwin)
     webrick (1.9.1)
 
 PLATFORMS
   arm64-darwin-24
+  x86_64-linux
 
 DEPENDENCIES
   dotenv (~> 2.7)

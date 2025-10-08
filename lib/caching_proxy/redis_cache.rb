@@ -20,7 +20,7 @@ module CachingProxy
 
       # Test connection
       @redis.ping
-      @logger.info("RedisCache: Connected to Redis at #{@redis.connection[:host]}:#{@redis.connection[:port]}")
+      @logger.info("RedisCache: Successfully connected to Redis at #{get_redis_connection_info}")
     rescue Redis::CannotConnectError => e
       raise "Cannot connect to Redis: #{e.message}"
     end
@@ -103,6 +103,28 @@ module CachingProxy
     end
 
     private
+
+    def get_redis_connection_info
+      # Safely extract connection information from Redis client
+      begin
+        # Try to get connection info from the client's public API
+        if @redis.respond_to?(:connection) && @redis.connection.respond_to?(:fetch)
+          host = @redis.connection.fetch(:host, 'unknown')
+          port = @redis.connection.fetch(:port, 'unknown')
+          "#{host}:#{port}"
+        elsif @redis.respond_to?(:connection) && @redis.connection.is_a?(Hash)
+          host = @redis.connection[:host] || @redis.connection['host'] || 'unknown'
+          port = @redis.connection[:port] || @redis.connection['port'] || 'unknown'
+          "#{host}:#{port}"
+        else
+          # Fallback: try to extract from Redis ID or use generic message
+          @redis.respond_to?(:id) ? @redis.id : 'Redis server'
+        end
+      rescue => e
+        # If all else fails, return a generic message
+        "Redis server (connection details unavailable: #{e.message})"
+      end
+    end
 
     def default_logger
       @default_logger ||= begin

@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require_relative 'persistent_cache'
+require 'logger'
 
 module CachingProxy
   class RedisCache < PersistentCache
-    def initialize(redis_url = nil, default_ttl = DEFAULT_TTL)
+    def initialize(redis_url = nil, default_ttl = DEFAULT_TTL, logger: nil)
       super(default_ttl)
+      @logger = logger || default_logger
 
       begin
         require 'redis'
@@ -18,7 +20,7 @@ module CachingProxy
 
       # Test connection
       @redis.ping
-      puts "Connected to Redis at #{@redis.connection[:host]}:#{@redis.connection[:port]}"
+      @logger.info("RedisCache: Connected to Redis at #{@redis.connection[:host]}:#{@redis.connection[:port]}")
     rescue Redis::CannotConnectError => e
       raise "Cannot connect to Redis: #{e.message}"
     end
@@ -101,6 +103,17 @@ module CachingProxy
     end
 
     private
+
+    def default_logger
+      @default_logger ||= begin
+        logger = Logger.new($stderr)
+        logger.level = Logger::INFO
+        logger.formatter = proc do |severity, datetime, progname, msg|
+          "#{severity}: #{msg}\n"
+        end
+        logger
+      end
+    end
 
     def serialize_value(value)
       # Store metadata along with value for better debugging

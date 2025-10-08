@@ -23,7 +23,7 @@ end
 
 # Demo 2: Memory Cache (baseline)
 puts "2. Memory Cache (Baseline):"
-memory_cache = CachingProxy::CacheFactory.create('memory', default_ttl: 300)
+memory_cache = CachingProxy::CacheFactory.create_cache('memory', default_ttl: 300)
 memory_cache.set('demo_key', 'demo_value')
 puts "   Set 'demo_key' = 'demo_value'"
 puts "   Get 'demo_key' = '#{memory_cache.get('demo_key')}'"
@@ -33,7 +33,7 @@ puts
 # Demo 3: SQLite Cache
 puts "3. SQLite Cache (Persistent, Single-Node):"
 begin
-  sqlite_cache = CachingProxy::CacheFactory.create('sqlite', database_path: 'demo_cache.db')
+  sqlite_cache = CachingProxy::CacheFactory.create_cache('sqlite', database_path: 'demo_cache.db')
 
   # Set some data
   sqlite_cache.set('user:123:profile', { name: 'John Doe', email: 'john@example.com' })
@@ -57,7 +57,7 @@ puts
 # Demo 4: Redis Cache
 puts "4. Redis Cache (Persistent, Distributed):"
 begin
-  redis_cache = CachingProxy::CacheFactory.create('redis')
+  redis_cache = CachingProxy::CacheFactory.create_cache('redis')
 
   # Set some data with different TTLs
   redis_cache.set('session:abc123', { user_id: 456, expires: Time.now + 3600 })
@@ -81,7 +81,7 @@ puts
 # Demo 5: Pattern invalidation
 puts "5. Pattern Invalidation Demo:"
 begin
-  cache = CachingProxy::CacheFactory.create('sqlite', database_path: 'pattern_demo.db')
+  cache = CachingProxy::CacheFactory.create_cache('sqlite', database_path: 'pattern_demo.db')
 
   # Set up test data
   cache.set('user:1:profile', 'User 1 Profile')

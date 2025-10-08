@@ -7,33 +7,62 @@ require_relative '../lib/caching_proxy/cache_factory'
 RSpec.describe 'CachingProxy::CacheFactory' do
   describe '.create' do
     it 'creates memory cache by default' do
-      cache = CachingProxy::CacheFactory.create
-      expect(cache).to be_a(CachingProxy::Cache)
+      result = CachingProxy::CacheFactory.create
+      expect(result.cache).to be_a(CachingProxy::Cache)
+      expect(result.backend_used).to eq('memory')
+      expect(result.success?).to be true
+      expect(result.fallback?).to be false
     end
 
     it 'creates memory cache when explicitly requested' do
-      cache = CachingProxy::CacheFactory.create('memory')
-      expect(cache).to be_a(CachingProxy::Cache)
+      result = CachingProxy::CacheFactory.create('memory')
+      expect(result.cache).to be_a(CachingProxy::Cache)
+      expect(result.backend_used).to eq('memory')
+      expect(result.success?).to be true
     end
 
     it 'accepts default_ttl option for memory cache' do
-      cache = CachingProxy::CacheFactory.create('memory', default_ttl: 600)
-      cache.set('test', 'value')
-      expect(cache.get('test')).to eq('value')
+      result = CachingProxy::CacheFactory.create('memory', default_ttl: 600)
+      result.cache.set('test', 'value')
+      expect(result.cache.get('test')).to eq('value')
     end
 
     it 'falls back to memory cache when backend dependencies are missing' do
-      # Test with a backend that requires gems we don't have
-      allow(CachingProxy::CacheFactory).to receive(:require).and_raise(LoadError, "cannot load such file -- nonexistent_gem")
+      # Mock the require call to simulate missing gem
+      allow_any_instance_of(Object).to receive(:require).with('redis').and_raise(LoadError, "cannot load such file -- redis")
 
-      cache = CachingProxy::CacheFactory.create('redis')
-      expect(cache).to be_a(CachingProxy::Cache) # Falls back to memory
+      result = CachingProxy::CacheFactory.create('redis')
+      expect(result.cache).to be_a(CachingProxy::Cache) # Falls back to memory
+      expect(result.backend_used).to eq('memory')
+      expect(result.fallback?).to be true
+      expect(result.error_message).to include('Redis gem not available')
+    end
+
+    it 'falls back to memory cache when backend connection fails' do
+      # This test covers the Redis connection failure scenario
+      result = CachingProxy::CacheFactory.create('redis')
+      expect(result.cache).to be_a(CachingProxy::Cache) # Falls back to memory
+      expect(result.backend_used).to eq('memory')
+      expect(result.fallback?).to be true
+      expect(result.error_message).to include('Error initializing redis cache')
     end
 
     it 'raises error for unsupported backend' do
       expect {
         CachingProxy::CacheFactory.create('unsupported')
       }.to raise_error(ArgumentError, /Unsupported cache backend/)
+    end
+  end
+
+  describe '.create_cache' do
+    it 'returns just the cache instance for backward compatibility' do
+      cache = CachingProxy::CacheFactory.create_cache
+      expect(cache).to be_a(CachingProxy::Cache)
+    end
+
+    it 'works with options' do
+      cache = CachingProxy::CacheFactory.create_cache('memory', default_ttl: 600)
+      expect(cache).to be_a(CachingProxy::Cache)
     end
   end
 
@@ -75,7 +104,7 @@ end
 RSpec.describe 'CachingProxy::SqliteCache', if: defined?(SQLite3) do
   let(:temp_dir) { Dir.mktmpdir }
   let(:db_path) { File.join(temp_dir, 'test_cache.db') }
-  let(:cache) { CachingProxy::CacheFactory.create('sqlite', database_path: db_path) }
+  let(:cache) { CachingProxy::CacheFactory.create_cache('sqlite', database_path: db_path) }
 
   after do
     cache.close if cache.respond_to?(:close)
@@ -92,7 +121,7 @@ RSpec.describe 'CachingProxy::SqliteCache', if: defined?(SQLite3) do
     cache.close
 
     # Create new cache instance with same database
-    new_cache = CachingProxy::CacheFactory.create('sqlite', database_path: db_path)
+    new_cache = CachingProxy::CacheFactory.create_cache('sqlite', database_path: db_path)
     expect(new_cache.get('persistent_key')).to eq('persistent_value')
     new_cache.close
   end
@@ -143,7 +172,7 @@ end
 
 # Test Redis cache if available (mock Redis if not)
 RSpec.describe 'CachingProxy::RedisCache' do
-  let(:cache) { CachingProxy::CacheFactory.create('redis', redis_url: 'redis://localhost:6379/15') }
+  let(:cache) { CachingProxy::CacheFactory.create_cache('redis', redis_url: 'redis://localhost:6379/15') }
 
   before do
     # Skip Redis tests if Redis is not available
@@ -171,7 +200,7 @@ RSpec.describe 'CachingProxy::RedisCache' do
     cache.close
 
     # Create new cache instance with same Redis database
-    new_cache = CachingProxy::CacheFactory.create('redis', redis_url: 'redis://localhost:6379/15')
+    new_cache = CachingProxy::CacheFactory.create_cache('redis', redis_url: 'redis://localhost:6379/15')
     expect(new_cache.get('redis_persistent_key')).to eq('redis_persistent_value')
     new_cache.close
   end

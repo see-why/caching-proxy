@@ -28,13 +28,13 @@ RSpec.describe 'CachingProxy::CacheFactory' do
     end
 
     it 'falls back to memory cache when backend dependencies are missing' do
-      # Mock the require call to simulate missing gem
-      allow_any_instance_of(Object).to receive(:require).with('redis').and_raise(LoadError, "cannot load such file -- redis")
+      # Mock the require_relative call to simulate missing Redis cache class
+      allow(CachingProxy::CacheFactory).to receive(:require_relative).with('redis_cache').and_raise(LoadError.new('cannot load such file -- redis_cache'))
 
-      result = CachingProxy::CacheFactory.create('redis')
-      expect(result.cache).to be_a(CachingProxy::Cache) # Falls back to memory
-      expect(result.backend_used).to eq('memory')
-      expect(result.fallback?).to be true
+      result = CachingProxy::CacheFactory.create(:redis, redis_url: 'redis://localhost:6379', logger: @logger)
+
+      expect(result.success?).to be false
+      expect(result.cache).to be_a(CachingProxy::Cache)  # Falls back to memory cache
       expect(result.error_message).to include('Redis gem not available')
     end
 
